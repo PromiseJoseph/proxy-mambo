@@ -1,6 +1,11 @@
+use crate::stream::handle_stream;
 use tokio::net::TcpListener;
 mod config;
-
+mod proxy;
+mod request;
+mod stream;
+mod types;
+use crate::types::Client;
 const PROXY_SERVER_ADDR: &str = "127.0.0.1:7777";
 
 #[tokio::main]
@@ -22,11 +27,19 @@ async fn main() {
     );
 
     loop {
-        let (stream, _) = tcp_listener
+        let (stream, peer_addr) = tcp_listener
             .accept()
             .await
-            .expect("Failed to accept incoming connection");
+            .expect("Failed to accept connection");
         println!("Accepted connection from {}", stream.peer_addr().unwrap());
-        // tokio::spawn(async move {});
+
+        let (reader, writer) = stream.into_split();
+        let client = Client { peer_addr };
+
+        tokio::spawn(async move {
+            if let Err(e) = handle_stream(reader, writer, client).await {
+                eprintln!("Error handling client connection: {}", e);
+            }
+        });
     }
 }
