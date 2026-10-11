@@ -31,13 +31,13 @@ async fn main() {
             .accept()
             .await
             .expect("Failed to accept connection");
+
         println!("Accepted connection from {}", stream.peer_addr().unwrap());
 
-        let (reader, writer) = stream.into_split();
         let client = Client { peer_addr };
 
         tokio::spawn(async move {
-            if let Err(e) = handle_stream(reader, writer, client).await {
+            if let Err(e) = handle_stream(stream, client).await {
                 eprintln!("Error handling client connection: {}", e);
             }
         });
