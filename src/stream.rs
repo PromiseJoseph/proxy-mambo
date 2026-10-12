@@ -7,7 +7,7 @@ pub async fn handle_stream(client_stream: TcpStream, client: Client) -> Result<(
     loop {
         let peer_addr = &client.peer_addr;
 
-        match proxy::relay(client_stream).await {
+        match proxy::relay(client_stream, &client).await {
             Ok(()) => {
                 println!("Finished proxy connection for {}", peer_addr);
                 return Ok(());

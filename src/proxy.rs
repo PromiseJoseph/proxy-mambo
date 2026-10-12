@@ -1,10 +1,11 @@
 use crate::request;
+use crate::types::Client;
 use std::io::{Error, ErrorKind};
 use tokio::io::copy_bidirectional;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub async fn relay(mut client_stream: TcpStream) -> Result<(), std::io::Error> {
+pub async fn relay(mut client_stream: TcpStream, client: &Client) -> Result<(), std::io::Error> {
     let upstream_addr = std::env::args().nth(2).unwrap();
 
     // Connect to the upstream server
@@ -60,8 +61,11 @@ pub async fn relay(mut client_stream: TcpStream) -> Result<(), std::io::Error> {
     };
 
     // Modify only the HTTP headers.
-    let updated_headers =
-        request::update_request_headers(&request_buffer[..header_end], &upstream_addr.as_str())?;
+    let updated_headers = request::update_request_headers(
+        &request_buffer[..header_end],
+        &upstream_addr.as_str(),
+        &client,
+    )?;
 
     // Send the updated headers.
     let mut forwarded = updated_headers;
