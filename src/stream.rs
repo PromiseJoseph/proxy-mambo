@@ -1,13 +1,18 @@
 use crate::proxy;
-use crate::types::Client;
+use crate::types::{Client, Config};
 use std::io::Error;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 
-pub async fn handle_stream(client_stream: TcpStream, client: Client) -> Result<(), Error> {
+pub async fn handle_stream(
+    client_stream: TcpStream,
+    client: Client,
+    config: Arc<Config>,
+) -> Result<(), Error> {
     loop {
         let peer_addr = &client.peer_addr;
 
-        match proxy::relay(client_stream, &client).await {
+        match proxy::relay(client_stream, &client, config).await {
             Ok(()) => {
                 println!("Finished proxy connection for {}", peer_addr);
                 return Ok(());
