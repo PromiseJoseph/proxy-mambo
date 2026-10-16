@@ -1,15 +1,33 @@
 use crate::request;
-use crate::types::Client;
+use crate::types::{Client, Config};
 use std::io::{Error, ErrorKind};
+use std::sync::Arc;
 use tokio::io::copy_bidirectional;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-pub async fn relay(mut client_stream: TcpStream, client: &Client) -> Result<(), std::io::Error> {
-    let upstream_addr = std::env::args().nth(2).unwrap();
+pub async fn relay(
+    mut client_stream: TcpStream,
+    client: &Client,
+    config: Arc<Config>,
+) -> Result<(), std::io::Error> {
+    let upstream = config.get_upstream("default"); //to be addressed, with a load balancer to select an upstream server based on the request route.
+
+    if upstream.is_none() {
+        //test for default upstream server
+        println!(
+            "defualt upstream server: {}",
+            config.get_upstream("default").unwrap().addr
+        );
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            "No upstream server configured",
+        )); //to be addressed in the future with a http response with status code 502 Bad Gateway.
+    }
+    let upstream_addr = upstream.unwrap().addr.clone();
 
     // Connect to the upstream server
-    let stream_res = connect_to_upstream(&upstream_addr).await;
+    let stream_res = connect_to_upstream(&upstream_addr).await; // using only one upstream server for now.
 
     let mut upstream_stream = match stream_res {
         Ok(strm) => strm,
@@ -21,7 +39,8 @@ pub async fn relay(mut client_stream: TcpStream, client: &Client) -> Result<(), 
 
     let mut request_buffer = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
-    const MAX_HEADER_SIZE: usize = 64 * 1024;
+
+    let max_header_size = config.get_max_header_size();
 
     let header_end = loop {
         let bytes_read = match client_stream.read(&mut chunk).await {
@@ -42,7 +61,7 @@ pub async fn relay(mut client_stream: TcpStream, client: &Client) -> Result<(), 
         request_buffer.extend_from_slice(&chunk[..bytes_read]);
 
         if let Some(end) = find_header_end(&request_buffer) {
-            if end > MAX_HEADER_SIZE {
+            if end > max_header_size {
                 return Err(Error::new(
                     ErrorKind::InvalidData,
                     "HTTP headers are too large",
@@ -52,7 +71,7 @@ pub async fn relay(mut client_stream: TcpStream, client: &Client) -> Result<(), 
             break end;
         }
 
-        if request_buffer.len() > MAX_HEADER_SIZE {
+        if request_buffer.len() > max_header_size {
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 "HTTP headers are too large",
@@ -83,33 +102,6 @@ pub async fn relay(mut client_stream: TcpStream, client: &Client) -> Result<(), 
     );
 
     Ok(())
-
-    // // Send the request to upstream server
-    // let incoming_request = update_request(request);
-
-    // upstream_stream
-    //     .write_all(incoming_request.as_bytes())
-    //     .await
-    //     .expect("Failed to send request to server");
-
-    // println!("Sent request to server: \"{}\"", incoming_request);
-
-    // let mut buffer = [0; 1024];
-    // let bytes_read = match upstream_stream.read(&mut buffer).await {
-    //     Ok(bytes) => bytes,
-    //     Err(e) => {
-    //         eprintln!("Error: {}", e);
-    //         return String::from("Failed to read response from server.");
-    //     }
-    // };
-
-    // if bytes_read == 0 {
-    //     return String::from("Server closed the connection unexpectedly.");
-    // }
-
-    // let response = String::from_utf8_lossy(&buffer[..bytes_read]);
-    // let updated_response = update_response(&response);
-    // return updated_response;
 }
 
 //=== handles connection to upstream ===//

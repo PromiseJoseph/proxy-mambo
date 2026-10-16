@@ -55,8 +55,15 @@ pub struct Router {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct StatusCode(pub u16);
 
-#[derive(Debug, PartialEq)]
-pub(crate) enum ParamType {
-    String,
-    U16,
+#[derive(Debug, Clone)]
+pub struct Upstream {
+    pub id: String,
+    pub addr: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Config {
+    pub(crate) proxy_addr: String,
+    pub(crate) upstream_addr: Vec<Upstream>,
+    pub(crate) max_header_size: usize,
 }
