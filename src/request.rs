@@ -3,14 +3,6 @@ use std::io::{Error, ErrorKind, Result};
 /**
  *  Parsea request string and return a HttpRequest struct.
  */
-pub fn update_response(response: &str) -> String {
-    let response_header: Vec<&str> = response.split("\r\n\r\n").collect();
-
-    let updated_response_header = response_header[0].to_string() + "\r\n\r\n"; //test'
-    let updated_response = updated_response_header + &response_header[1];
-
-    return updated_response.to_string();
-}
 
 pub fn update_request_headers(
     headers: &[u8],

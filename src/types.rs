@@ -43,11 +43,12 @@ pub enum HttpMethod {
     HEAD,
 }
 
-pub(crate) struct Route {
+#[derive(Debug, Clone)]
+pub struct Route {
     pub path: String,
-    pub method: HttpMethod,
-    pub handler: Handler,
+    pub upstream_id: String,
 }
+
 pub struct Router {
     pub(crate) routes: Vec<Route>,
 }
@@ -66,4 +67,5 @@ pub struct Config {
     pub(crate) proxy_addr: String,
     pub(crate) upstream_addr: Vec<Upstream>,
     pub(crate) max_header_size: usize,
+    pub(crate) routes: Vec<Route>,
 }

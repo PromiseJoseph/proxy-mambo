@@ -1,4 +1,4 @@
-use crate::types::{Config, Upstream};
+use crate::types::{Config, Route, Upstream};
 
 impl Config {
     pub fn new() -> Self {
@@ -9,14 +9,16 @@ impl Config {
                 addr: "127.0.0.1:8000".to_string(),
             }],
             max_header_size: 16384, // Default maximum header size set to 16KiB
+            routes: vec![],
         }
     }
 
     pub fn add_upstream(&mut self, upstream: Upstream) {
-        self.upstream_addr.push(Upstream {
-            id: upstream.id,
-            addr: upstream.addr,
-        });
+        self.upstream_addr.push(upstream);
+    }
+
+    pub fn set_upstreams(&mut self, upstreams: Vec<Upstream>) {
+        self.upstream_addr = upstreams;
     }
 
     pub fn get_upstream(&self, id: &str) -> Option<&Upstream> {
@@ -41,5 +43,13 @@ impl Config {
 
     pub fn get_max_header_size(&self) -> usize {
         self.max_header_size
+    }
+
+    pub fn set_route(&mut self, route: Route) {
+        self.routes.push(route);
+    }
+
+    pub fn set_routes(&mut self, routes: Vec<Route>) {
+        self.routes = routes;
     }
 }
