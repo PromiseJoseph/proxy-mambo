@@ -11,38 +11,15 @@ pub async fn relay(
     client: &Client,
     config: Arc<Config>,
 ) -> Result<(), std::io::Error> {
-    let upstream = config.get_upstream("default"); //to be addressed, with a load balancer to select an upstream server based on the request route.
-
-    if upstream.is_none() {
-        //test for default upstream server
-        println!(
-            "defualt upstream server: {}",
-            config.get_upstream("default").unwrap().addr
-        );
-        return Err(Error::new(
-            ErrorKind::NotFound,
-            "No upstream server configured",
-        )); //to be addressed in the future with a http response with status code 502 Bad Gateway.
-    }
-    let upstream_addr = upstream.unwrap().addr.clone();
-
     // Connect to the upstream server
-    let stream_res = connect_to_upstream(&upstream_addr).await; // using only one upstream server for now.
-
-    let mut upstream_stream = match stream_res {
-        Ok(strm) => strm,
-        Err(e) => {
-            eprintln!("Failed to connect to server: {}", e);
-            return Err(Error::new(ErrorKind::Other, "Failed to connect to server.")); // test will be changed to a http response with status code 502 Bad Gateway..
-        }
-    };
 
     let mut request_buffer = Vec::with_capacity(4096);
     let mut chunk = [0u8; 4096];
 
     let max_header_size = config.get_max_header_size();
 
-    let header_end = loop {
+    // Read the request headers from the client stream until we find the end of the headers or exceed the maximum header size.
+    let header_end_pos = loop {
         let bytes_read = match client_stream.read(&mut chunk).await {
             Ok(bytes) => bytes,
             Err(e) => {
@@ -70,7 +47,7 @@ pub async fn relay(
 
             break end;
         }
-
+        //to be addressed as a http response with status code 431 Request Header Fields Too Large..
         if request_buffer.len() > max_header_size {
             return Err(Error::new(
                 ErrorKind::InvalidData,
@@ -80,15 +57,20 @@ pub async fn relay(
     };
 
     // Modify only the HTTP headers.
-    let updated_headers = request::update_request_headers(
-        &request_buffer[..header_end],
-        &upstream_addr.as_str(),
-        &client,
-    )?;
+    let (updated_headers, upstream_addr) =
+        request::update_request_headers(&request_buffer[..header_end_pos], &client, &config)?;
+    let stream_res = connect_to_upstream(&upstream_addr).await; // using only one upstream server for now.
 
+    let mut upstream_stream = match stream_res {
+        Ok(strm) => strm,
+        Err(e) => {
+            eprintln!("Failed to connect to server: {}", e);
+            return Err(Error::new(ErrorKind::Other, "Failed to connect to server.")); // test will be changed to a http response with status code 502 Bad Gateway..
+        }
+    };
     // Send the updated headers.
     let mut forwarded = updated_headers;
-    forwarded.extend_from_slice(&request_buffer[header_end..]);
+    forwarded.extend_from_slice(&request_buffer[header_end_pos..]);
 
     upstream_stream.write_all(&forwarded).await?;
 

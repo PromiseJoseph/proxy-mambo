@@ -1,4 +1,4 @@
-use crate::types::{Config, Upstream};
+use crate::types::{Config, Route, Upstream};
 
 impl Config {
     pub fn new() -> Self {
@@ -9,14 +9,17 @@ impl Config {
                 addr: "127.0.0.1:8000".to_string(),
             }],
             max_header_size: 16384, // Default maximum header size set to 16KiB
+            routes: vec![],
         }
     }
 
+    // Upstream management methods
     pub fn add_upstream(&mut self, upstream: Upstream) {
-        self.upstream_addr.push(Upstream {
-            id: upstream.id,
-            addr: upstream.addr,
-        });
+        self.upstream_addr.push(upstream);
+    }
+
+    pub fn set_upstreams(&mut self, upstreams: Vec<Upstream>) {
+        self.upstream_addr = upstreams;
     }
 
     pub fn get_upstream(&self, id: &str) -> Option<&Upstream> {
@@ -27,6 +30,14 @@ impl Config {
         }
     }
 
+    pub fn get_upstreams(&self) -> &[Upstream] {
+        &self.upstream_addr
+    }
+    pub fn check_upstream_exists(&self, id: &str) -> bool {
+        self.upstream_addr.iter().any(|u| u.id == id)
+    }
+
+    // Proxy address and header size management methods
     pub fn set_proxy_addr(&mut self, addr: &str) {
         self.proxy_addr = addr.to_string();
     }
@@ -41,5 +52,26 @@ impl Config {
 
     pub fn get_max_header_size(&self) -> usize {
         self.max_header_size
+    }
+
+    //route management methods
+    pub fn set_route(&mut self, route: Route) {
+        self.routes.push(route);
+    }
+
+    pub fn set_routes(&mut self, routes: Vec<Route>) {
+        self.routes = routes;
+    }
+
+    pub fn get_routes(&self) -> &[Route] {
+        &self.routes
+    }
+
+    pub fn get_route(&self, path: &str) -> Option<&Route> {
+        self.routes.iter().find(|r| r.path == path)
+    }
+
+    pub fn check_route_exists(&self, path: &str) -> bool {
+        self.routes.iter().any(|r| r.path == path)
     }
 }
