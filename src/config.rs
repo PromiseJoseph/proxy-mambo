@@ -13,6 +13,7 @@ impl Config {
         }
     }
 
+    // Upstream management methods
     pub fn add_upstream(&mut self, upstream: Upstream) {
         self.upstream_addr.push(upstream);
     }
@@ -29,6 +30,14 @@ impl Config {
         }
     }
 
+    pub fn get_upstreams(&self) -> &[Upstream] {
+        &self.upstream_addr
+    }
+    pub fn check_upstream_exists(&self, id: &str) -> bool {
+        self.upstream_addr.iter().any(|u| u.id == id)
+    }
+
+    // Proxy address and header size management methods
     pub fn set_proxy_addr(&mut self, addr: &str) {
         self.proxy_addr = addr.to_string();
     }
@@ -45,11 +54,24 @@ impl Config {
         self.max_header_size
     }
 
+    //route management methods
     pub fn set_route(&mut self, route: Route) {
         self.routes.push(route);
     }
 
     pub fn set_routes(&mut self, routes: Vec<Route>) {
         self.routes = routes;
+    }
+
+    pub fn get_routes(&self) -> &[Route] {
+        &self.routes
+    }
+
+    pub fn get_route(&self, path: &str) -> Option<&Route> {
+        self.routes.iter().find(|r| r.path == path)
+    }
+
+    pub fn check_route_exists(&self, path: &str) -> bool {
+        self.routes.iter().any(|r| r.path == path)
     }
 }

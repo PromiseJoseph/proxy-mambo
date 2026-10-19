@@ -23,7 +23,7 @@ async fn main() {
 
     //upstream test
     let default_upstream_addr = config.get_upstream("default").unwrap().addr.clone();
-    let guest_upstream_addr = String::from("127.0.0.1:8001");
+    let guest_upstream_addr = String::from("127.0.0.1:8001"); // Default guest upstream address
 
     let main_upstream_addr = std::env::args()
         .nth(2)
@@ -52,16 +52,12 @@ async fn main() {
             addr: guest_upstream_addr,
         },
     ];
+    config.set_upstreams(upstreams.clone());
 
-    config.set_upstreams(upstreams);
-
-    //temporary test for the default upstream server
-    if main_upstream_addr != default_upstream_addr {
-        config.add_upstream(Upstream {
-            id: "main".to_string(),
-            addr: main_upstream_addr,
-        });
-    }
+    // //temporary test for the default upstream server
+    // if main_upstream_addr != default_upstream_addr {
+    //     config.set_upstreams(upstreams);
+    // }
 
     config.set_routes(routes);
 
