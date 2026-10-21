@@ -46,8 +46,8 @@ pub async fn relay(
             }
 
             break end;
-        }
-        //to be addressed as a http response with status code 431 Request Header Fields Too Large..
+        } //to be addressed as a http response with status code 431 Request Header Fields Too Large..
+
         if request_buffer.len() > max_header_size {
             return Err(Error::new(
                 ErrorKind::InvalidData,
@@ -59,6 +59,7 @@ pub async fn relay(
     // Modify only the HTTP headers.
     let (updated_headers, upstream_addr) =
         request::update_request_headers(&request_buffer[..header_end_pos], &client, &config)?;
+
     let stream_res = connect_to_upstream(&upstream_addr).await; // using only one upstream server for now.
 
     let mut upstream_stream = match stream_res {

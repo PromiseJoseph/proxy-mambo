@@ -1,4 +1,4 @@
-use crate::types::{Client, Config, Route, Upstream};
+use crate::types::{Client, Config, Route, UpstreamPool};
 use std::{
     io::{Error, ErrorKind, Result},
     println,
@@ -33,15 +33,18 @@ pub fn update_request_headers(
         ));
     } //to be addressed as a http response with status code 404 Not Found..
 
-    let upstream_host = upstream.unwrap().addr.clone(); //to be addressed as a http response with status code 404 Not Found..
+    let upstream_hosts = upstream.unwrap().upstreams; //to be addressed as a http response with status code 404 Not Found..
 
     // Prevent the configured Host value from injecting another header.
-    if upstream_host.contains('\r') || upstream_host.contains('\n') {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Invalid upstream Host value",
-        ));
+    for host in upstream_hosts {
+        if host.addr.contains('\r') || host.addr.contains('\n') {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "Invalid upstream Host value",
+            ));
+        }
     }
+    //round robbin here...
 
     let mut updated = Vec::with_capacity(header.len() + 128); //updated to be more efficient.. preallocate the vector with enough capacity to hold the original header and the new header items.
     let mut incoming_host: Option<Vec<u8>> = None;
@@ -134,10 +137,10 @@ fn parse_request_line(raw_header: &[u8]) -> Result<(&str, &str, &str)> {
 }
 
 // Find the upstream route for a given request path.
-fn find_upstream_for_path<'a>(path: &str, config: &'a Config) -> Option<&'a Upstream> {
+fn find_upstream_for_path<'a>(path: &str, config: &'a Config) -> Option<&'a UpstreamPool> {
     let routes: &[Route] = config.get_routes();
     let trimmed_path = path.trim_start_matches('/'); // Remove leading slashes for matching
-    let upstream = config.get_upstreams(); // Get the default upstream from the config
+    let upstream = config.get_upstream_pools(); // Get the default upstream from the config
     println!(
         "Finding upstream for path: {}, Routes: {:?}, Upstream: {:?}",
         trimmed_path, routes, upstream
@@ -145,7 +148,7 @@ fn find_upstream_for_path<'a>(path: &str, config: &'a Config) -> Option<&'a Upst
     let route = routes.iter().find(|route| route.path == path); // Remove leading slashes for matching
 
     if let Some(route) = route {
-        config.get_upstream(&route.upstream_id)
+        config.get_upstream_pool(&route.pool_id) // Use the pool_id to find the upstream
     } else {
         None
     }
