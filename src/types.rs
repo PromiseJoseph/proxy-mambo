@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::{Arc, atomic::AtomicUsize};
 use std::{collections::HashMap, net::SocketAddr};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -61,10 +62,17 @@ pub struct Upstream {
     pub id: String,
     pub addr: String,
 }
+
+#[derive(Debug, Clone)]
+pub enum LoadBalancingAlgorithm {
+    RoundRobin { current_index: Arc<AtomicUsize> },
+}
+
 #[derive(Debug, Clone)]
 pub struct UpstreamPool {
     pub id: String,
     pub upstreams: Vec<Upstream>,
+    pub algorithm: LoadBalancingAlgorithm,
 }
 
 #[derive(Debug, Clone)]

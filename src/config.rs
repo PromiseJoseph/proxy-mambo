@@ -1,4 +1,5 @@
-use crate::types::{Config, Route, Upstream, UpstreamPool};
+use crate::types::{Config, LoadBalancingAlgorithm, Route, Upstream, UpstreamPool};
+use std::sync::{Arc, atomic::AtomicUsize};
 
 impl Config {
     pub fn new() -> Self {
@@ -6,6 +7,9 @@ impl Config {
             proxy_addr: "127.0.0.1:8080".to_string(),
             upstream_pools: vec![UpstreamPool {
                 id: "default".to_string(),
+                algorithm: LoadBalancingAlgorithm::RoundRobin {
+                    current_index: Arc::new(AtomicUsize::new(0)),
+                },
                 upstreams: vec![Upstream {
                     id: "default-main".to_string(),
                     addr: "127.0.0.1:8000".to_string(),
@@ -28,9 +32,15 @@ impl Config {
         }
     }
 
-    pub fn add_upstream_pool(&mut self, id: &str, upstreams: Vec<Upstream>) {
+    pub fn add_upstream_pool(
+        &mut self,
+        id: &str,
+        upstreams: Vec<Upstream>,
+        lba: LoadBalancingAlgorithm,
+    ) {
         self.upstream_pools.push(UpstreamPool {
             id: id.to_string(),
+            algorithm: lba,
             upstreams,
         });
     }
@@ -61,6 +71,13 @@ impl Config {
     }
     pub fn check_upstream_pool_exists(&self, id: &str) -> bool {
         self.upstream_pools.iter().any(|p| p.id == id)
+    }
+
+    pub fn get_pool_algorithm(&self, pool_id: &str) -> Option<&LoadBalancingAlgorithm> {
+        self.upstream_pools
+            .iter()
+            .find(|p| p.id == pool_id)
+            .map(|p| &p.algorithm)
     }
 
     /* ===Proxy address and header size management methods=== */

@@ -1,13 +1,14 @@
-use std::{sync::Arc, vec};
+use std::{sync::Arc, sync::atomic::AtomicUsize, vec};
 
 use crate::stream::handle_stream;
 use tokio::net::TcpListener;
+mod algorithm;
 mod config;
 mod proxy;
 mod request;
 mod stream;
 mod types;
-use crate::types::{Client, Config, Route, Upstream, UpstreamPool};
+use crate::types::{Client, Config, LoadBalancingAlgorithm, Route, Upstream, UpstreamPool};
 
 #[tokio::main]
 async fn main() {
@@ -53,15 +54,21 @@ async fn main() {
     let upstreams = vec![
         UpstreamPool {
             id: "api".to_string(),
+            algorithm: LoadBalancingAlgorithm::RoundRobin {
+                current_index: Arc::new(AtomicUsize::new(0)),
+            },
             upstreams: vec![Upstream {
-                id: "api".to_string(),
+                id: "api-1".to_string(),
                 addr: main_upstream_addr.clone(),
             }],
         },
         UpstreamPool {
             id: "guest".to_string(),
+            algorithm: LoadBalancingAlgorithm::RoundRobin {
+                current_index: Arc::new(AtomicUsize::new(0)),
+            },
             upstreams: vec![Upstream {
-                id: "guest".to_string(),
+                id: "guest-1".to_string(),
                 addr: guest_upstream_addr,
             }],
         },

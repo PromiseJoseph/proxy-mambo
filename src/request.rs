@@ -1,4 +1,7 @@
-use crate::types::{Client, Config, Route, UpstreamPool};
+use crate::{
+    algorithm,
+    types::{Client, Config, Route, UpstreamPool},
+};
 use std::{
     io::{Error, ErrorKind, Result},
     println,
@@ -24,27 +27,31 @@ pub fn update_request_headers(
         "Parsed request line: method={}, path={}, version={}",
         method, path, version
     );
-    let upstream = find_upstream_for_path(path, config);
+    let pool = find_upstream_for_path(path, config);
 
-    if upstream.is_none() {
+    if pool.is_none() {
         return Err(Error::new(
             ErrorKind::NotFound,
             "No upstream found for the requested path",
         ));
     } //to be addressed as a http response with status code 404 Not Found..
+    println!("Found upstream pool  for path: {}, Pool: {:?}", path, pool);
 
-    let upstream_hosts = upstream.unwrap().upstreams; //to be addressed as a http response with status code 404 Not Found..
+    let upstream_pool = pool.unwrap();
 
-    // Prevent the configured Host value from injecting another header.
-    for host in upstream_hosts {
-        if host.addr.contains('\r') || host.addr.contains('\n') {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                "Invalid upstream Host value",
-            ));
-        }
+    let upstream = algorithm::use_algorithm(upstream_pool);
+
+    let upstream_host = upstream
+        .ok_or_else(|| Error::new(ErrorKind::NotFound, "No upstream available"))?
+        .addr
+        .clone(); //to be addressed as a http response with status code 503 Service Unavailable..
+
+    if upstream_host.contains('\r') || upstream_host.contains('\n') {
+        return Err(Error::new(
+            ErrorKind::InvalidInput,
+            "Invalid upstream Host value",
+        )); //to be addressed as a http response with status code 502 Bad Gateway..
     }
-    //round robbin here...
 
     let mut updated = Vec::with_capacity(header.len() + 128); //updated to be more efficient.. preallocate the vector with enough capacity to hold the original header and the new header items.
     let mut incoming_host: Option<Vec<u8>> = None;
