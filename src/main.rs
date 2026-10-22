@@ -1,13 +1,14 @@
-use std::sync::Arc;
+use std::{sync::Arc, sync::atomic::AtomicUsize, vec};
 
 use crate::stream::handle_stream;
 use tokio::net::TcpListener;
+mod algorithm;
 mod config;
 mod proxy;
 mod request;
 mod stream;
 mod types;
-use crate::types::{Client, Config, Route, Upstream};
+use crate::types::{Client, Config, LoadBalancingAlgorithm, Route, Upstream, UpstreamPool};
 
 #[tokio::main]
 async fn main() {
@@ -22,7 +23,15 @@ async fn main() {
     };
 
     //upstream test
-    let default_upstream_addr = config.get_upstream("default").unwrap().addr.clone();
+    let default_upstream_addr = config
+        .get_upstream_pool("default")
+        .unwrap()
+        .upstreams
+        .first()
+        .unwrap()
+        .addr
+        .clone();
+
     let guest_upstream_addr = String::from("127.0.0.1:8001"); // Default guest upstream address
 
     let main_upstream_addr = std::env::args()
@@ -34,25 +43,38 @@ async fn main() {
     let routes = vec![
         Route {
             path: "/api".to_string(),
-            upstream_id: "api".to_string(),
+            pool_id: "api".to_string(),
         },
         Route {
             path: "/".to_string(),
-            upstream_id: "guest".to_string(),
+            pool_id: "guest".to_string(),
         },
     ];
 
     let upstreams = vec![
-        Upstream {
+        UpstreamPool {
             id: "api".to_string(),
-            addr: main_upstream_addr.clone(),
+            algorithm: LoadBalancingAlgorithm::RoundRobin {
+                current_index: Arc::new(AtomicUsize::new(0)),
+            },
+            upstreams: vec![Upstream {
+                id: "api-1".to_string(),
+                addr: main_upstream_addr.clone(),
+            }],
         },
-        Upstream {
+        UpstreamPool {
             id: "guest".to_string(),
-            addr: guest_upstream_addr,
+            algorithm: LoadBalancingAlgorithm::RoundRobin {
+                current_index: Arc::new(AtomicUsize::new(0)),
+            },
+            upstreams: vec![Upstream {
+                id: "guest-1".to_string(),
+                addr: guest_upstream_addr,
+            }],
         },
     ];
-    config.set_upstreams(upstreams.clone());
+
+    config.new_upstream_pools(upstreams.clone());
 
     // //temporary test for the default upstream server
     // if main_upstream_addr != default_upstream_addr {

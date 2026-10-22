@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::{Arc, atomic::AtomicUsize};
 use std::{collections::HashMap, net::SocketAddr};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,7 +47,7 @@ pub enum HttpMethod {
 #[derive(Debug, Clone)]
 pub struct Route {
     pub path: String,
-    pub upstream_id: String,
+    pub pool_id: String,
 }
 
 pub struct Router {
@@ -63,9 +64,21 @@ pub struct Upstream {
 }
 
 #[derive(Debug, Clone)]
+pub enum LoadBalancingAlgorithm {
+    RoundRobin { current_index: Arc<AtomicUsize> },
+}
+
+#[derive(Debug, Clone)]
+pub struct UpstreamPool {
+    pub id: String,
+    pub upstreams: Vec<Upstream>,
+    pub algorithm: LoadBalancingAlgorithm,
+}
+
+#[derive(Debug, Clone)]
 pub struct Config {
     pub(crate) proxy_addr: String,
-    pub(crate) upstream_addr: Vec<Upstream>,
+    pub(crate) upstream_pools: Vec<UpstreamPool>,
     pub(crate) max_header_size: usize,
     pub(crate) routes: Vec<Route>,
 }
