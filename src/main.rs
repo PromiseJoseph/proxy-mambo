@@ -1,7 +1,12 @@
-use std::{sync::Arc, sync::atomic::AtomicUsize, vec};
+use std::{
+    collections::HashMap,
+    sync::{Arc, atomic::AtomicUsize},
+    vec,
+};
 
 use crate::stream::handle_stream;
 use tokio::net::TcpListener;
+use tokio::sync::{Mutex, RwLock};
 mod algorithm;
 mod config;
 mod proxy;
@@ -51,6 +56,18 @@ async fn main() {
         },
     ];
 
+    let weights = HashMap::from([
+        ("guest-1".to_string(), 5),
+        ("guest-2".to_string(), 1),
+        ("guest-3".to_string(), 1),
+    ]);
+
+    let current_weights = HashMap::from([
+        ("guest-1".to_string(), 0),
+        ("guest-2".to_string(), 0),
+        ("guest-3".to_string(), 0),
+    ]);
+
     let upstreams = vec![
         UpstreamPool {
             id: "api".to_string(),
@@ -64,8 +81,9 @@ async fn main() {
         },
         UpstreamPool {
             id: "guest".to_string(),
-            algorithm: LoadBalancingAlgorithm::RoundRobin {
-                current_index: Arc::new(AtomicUsize::new(0)),
+            algorithm: LoadBalancingAlgorithm::WeightedRoundRobin {
+                weights: weights,
+                current_weights: Mutex::new(current_weights), // Initialize the current weights with a Mutex for thread safety
             },
             upstreams: vec![Upstream {
                 id: "guest-1".to_string(),
@@ -74,7 +92,7 @@ async fn main() {
         },
     ];
 
-    config.new_upstream_pools(upstreams.clone());
+    config.new_upstream_pools(upstreams);
 
     // //temporary test for the default upstream server
     // if main_upstream_addr != default_upstream_addr {

@@ -10,7 +10,7 @@ use std::{
  *  Parse request string and return a HttpRequest struct.
  */
 
-pub fn update_request_headers(
+pub async fn update_request_headers(
     header: &[u8],
     client: &Client,
     config: &Config,
@@ -27,6 +27,7 @@ pub fn update_request_headers(
         "Parsed request line: method={}, path={}, version={}",
         method, path, version
     );
+    // Find the upstream pool for the requested path.
     let pool = find_upstream_for_path(path, config);
 
     if pool.is_none() {
@@ -39,7 +40,7 @@ pub fn update_request_headers(
 
     let upstream_pool = pool.unwrap();
 
-    let upstream = algorithm::use_algorithm(upstream_pool);
+    let upstream = algorithm::use_algorithm(upstream_pool).await;
 
     let upstream_host = upstream
         .ok_or_else(|| Error::new(ErrorKind::NotFound, "No upstream available"))?
