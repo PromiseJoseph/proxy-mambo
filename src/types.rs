@@ -2,6 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, atomic::AtomicUsize};
 use std::{collections::HashMap, net::SocketAddr};
+use tokio::sync::Mutex;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RequestLines {
@@ -63,19 +64,25 @@ pub struct Upstream {
     pub addr: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum LoadBalancingAlgorithm {
-    RoundRobin { current_index: Arc<AtomicUsize> },
+    RoundRobin {
+        current_index: Arc<AtomicUsize>,
+    },
+    WeightedRoundRobin {
+        weights: HashMap<String, usize>,
+        current_weights: Mutex<HashMap<String, isize>>,
+    },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UpstreamPool {
     pub id: String,
     pub upstreams: Vec<Upstream>,
     pub algorithm: LoadBalancingAlgorithm,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Config {
     pub(crate) proxy_addr: String,
     pub(crate) upstream_pools: Vec<UpstreamPool>,

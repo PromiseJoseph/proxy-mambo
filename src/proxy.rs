@@ -58,7 +58,8 @@ pub async fn relay(
 
     // Modify only the HTTP headers.
     let (updated_headers, upstream_addr) =
-        request::update_request_headers(&request_buffer[..header_end_pos], &client, &config)?;
+        request::update_request_headers(&request_buffer[..header_end_pos], &client, &config)
+            .await?;
 
     let stream_res = connect_to_upstream(&upstream_addr).await; // using only one upstream server for now.
 
