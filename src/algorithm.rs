@@ -42,6 +42,7 @@ async fn weighted_round_robin(pool: &UpstreamPool) -> Option<&Upstream> {
 
     let selected_id = {
         let mut current_weights = current_weights.lock().await;
+        println!("Before update: {:?}", *current_weights);
 
         let mut selected_id: Option<String> = None;
         let mut highest_weight = isize::MIN;
@@ -58,6 +59,8 @@ async fn weighted_round_robin(pool: &UpstreamPool) -> Option<&Upstream> {
                 selected_id = Some(upstream.id.clone());
             }
         }
+
+        println!("After update: {:?}", *current_weights);
 
         let selected_id = selected_id?;
 

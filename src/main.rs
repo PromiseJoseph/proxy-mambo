@@ -56,6 +56,7 @@ async fn main() {
         },
     ];
 
+    /*weight and current weight  for  weighted round-robin upstreams */
     let weights = HashMap::from([
         ("guest-1".to_string(), 5),
         ("guest-2".to_string(), 1),
@@ -82,22 +83,28 @@ async fn main() {
         UpstreamPool {
             id: "guest".to_string(),
             algorithm: LoadBalancingAlgorithm::WeightedRoundRobin {
+                /* Initialize the weights and current weights for the weighted round-robin algorithm */
                 weights: weights,
-                current_weights: Mutex::new(current_weights), // Initialize the current weights with a Mutex for thread safety
+                current_weights: Mutex::new(current_weights),
             },
-            upstreams: vec![Upstream {
-                id: "guest-1".to_string(),
-                addr: guest_upstream_addr,
-            }],
+            upstreams: vec![
+                Upstream {
+                    id: "guest-1".to_string(),
+                    addr: guest_upstream_addr,
+                },
+                Upstream {
+                    id: "guest-2".to_string(),
+                    addr: "127.0.0.1:8002".to_string(),
+                }, //test ustream server for guest-2.
+                Upstream {
+                    id: "guest-3".to_string(),
+                    addr: "127.0.0.1:8003".to_string(),
+                }, //test ustream server for guest-3.
+            ],
         },
     ];
 
     config.new_upstream_pools(upstreams);
-
-    // //temporary test for the default upstream server
-    // if main_upstream_addr != default_upstream_addr {
-    //     config.set_upstreams(upstreams);
-    // }
 
     config.set_routes(routes);
 
