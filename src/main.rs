@@ -51,6 +51,10 @@ async fn main() {
             pool_id: "api".to_string(),
         },
         Route {
+            path: "/api/*".to_string(),
+            pool_id: "api".to_string(),
+        }, // test for wildcard route matching..
+        Route {
             path: "/".to_string(),
             pool_id: "guest".to_string(),
         },
