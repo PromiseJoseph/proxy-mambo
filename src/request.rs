@@ -147,13 +147,14 @@ fn parse_request_line(raw_header: &[u8]) -> Result<(&str, &str, &str)> {
 // Find the upstream route for a given request path.
 fn find_upstream_for_path<'a>(path: &str, config: &'a Config) -> Option<&'a UpstreamPool> {
     let routes: &[Route] = config.get_routes();
-    let trimmed_path = path.trim_start_matches('/'); // Remove leading slashes for matching
-    let upstream = config.get_upstream_pools(); // Get the default upstream from the config
-    println!(
-        "Finding upstream for path: {}, Routes: {:?}, Upstream: {:?}",
-        trimmed_path, routes, upstream
-    );
-    let route = routes.iter().find(|route| route.path == path); // Remove leading slashes for matching
+
+    let route = routes.iter().find(|route| {
+        if let Some(prefix) = route.path.strip_suffix("/*") {
+            path == prefix || path.starts_with(&format!("{}/", prefix.trim_end_matches('/')))
+        } else {
+            route.path == path
+        }
+    });
 
     if let Some(route) = route {
         config.get_upstream_pool(&route.pool_id) // Use the pool_id to find the upstream
