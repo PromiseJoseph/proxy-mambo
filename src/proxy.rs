@@ -1,5 +1,7 @@
-use crate::request;
+use crate::error::ProxyError;
+use crate::response::{ErrorResponse, send_error_response};
 use crate::types::{Client, Config};
+use crate::{proxy, request};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tokio::io::copy_bidirectional;
@@ -58,18 +60,28 @@ pub async fn relay(
 
     // Modify only the HTTP headers.
     let (updated_headers, upstream_addr) =
-        request::update_request_headers(&request_buffer[..header_end_pos], &client, &config)
-            .await?;
+        match request::update_request_headers(&request_buffer[..header_end_pos], &client, &config)
+            .await
+        {
+            Ok((headers, addr)) => (headers, addr),
+            Err(e) => {
+                send_request_error(&mut client_stream, e).await?;
+                return Ok(());
+            }
+        };
 
-    let stream_res = connect_to_upstream(&upstream_addr).await; // using only one upstream server for now.
-
-    let mut upstream_stream = match stream_res {
+    let mut upstream_stream = match connect_to_upstream(&upstream_addr).await {
         Ok(strm) => strm,
         Err(e) => {
-            eprintln!("Failed to connect to server: {}", e);
-            return Err(Error::new(ErrorKind::Other, "Failed to connect to server.")); // test will be changed to a http response with status code 502 Bad Gateway..
+            eprintln!("Failed to connect to upstream: {}", e);
+
+            crate::response::send_error_response(&mut client_stream, ErrorResponse::BadGateway)
+                .await?;
+
+            return Ok(());
         }
     };
+
     // Send the updated headers.
     let mut forwarded = updated_headers;
     forwarded.extend_from_slice(&request_buffer[header_end_pos..]);
@@ -100,4 +112,13 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
         .windows(4)
         .position(|window| window == b"\r\n\r\n")
         .map(|position| position + 4)
+}
+
+pub async fn send_request_error(
+    client_stream: &mut TcpStream,
+    error: ProxyError,
+) -> std::io::Result<()> {
+    let response = ErrorResponse::from(error);
+
+    send_error_response(client_stream, response).await
 }

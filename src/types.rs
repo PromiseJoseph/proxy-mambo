@@ -89,3 +89,14 @@ pub struct Config {
     pub(crate) max_header_size: usize,
     pub(crate) routes: Vec<Route>,
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorResponse {
+    BadRequest,
+    NotFound,
+    RequestHeaderFieldsTooLarge,
+    InternalServerError,
+    BadGateway,
+    ServiceUnavailable,
+    Forbidden,
+}
