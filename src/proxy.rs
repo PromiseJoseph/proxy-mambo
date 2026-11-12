@@ -1,6 +1,6 @@
 use crate::error::ProxyError;
-use crate::response::{ErrorResponse, send_error_response};
-use crate::types::{Client, Config};
+use crate::response::send_error_response;
+use crate::types::{Client, Config, ErrorResponse};
 use crate::{proxy, request};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
@@ -65,7 +65,7 @@ pub async fn relay(
         {
             Ok((headers, addr)) => (headers, addr),
             Err(e) => {
-                send_request_error(&mut client_stream, e).await?;
+                send_request_error(&mut client_stream, ProxyError::BadGateway).await?;
                 return Ok(());
             }
         };

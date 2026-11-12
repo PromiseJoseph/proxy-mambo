@@ -1,12 +1,12 @@
+use crate::stream::handle_stream;
 use std::{
     collections::HashMap,
     sync::{Arc, atomic::AtomicUsize},
     vec,
 };
-
-use crate::stream::handle_stream;
 use tokio::net::TcpListener;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
+use tracing_subscriber;
 mod algorithm;
 mod config;
 mod error;
@@ -19,6 +19,11 @@ use crate::types::{Client, Config, LoadBalancingAlgorithm, Route, Upstream, Upst
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_target(true)
+        .init();
+
     let mut config = Config::new();
 
     //there will be no environment variables for the upstream server address for the final proxy-mambo MVP..
@@ -38,6 +43,8 @@ async fn main() {
         .unwrap()
         .addr
         .clone();
+
+    tracing::info!("Default upstream address: {}", default_upstream_addr);
 
     let guest_upstream_addr = String::from("127.0.0.1:8001"); // Default guest upstream address
 
@@ -116,10 +123,17 @@ async fn main() {
 
     config.set_max_header_size(8192);
 
-    let tcp_listener = TcpListener::bind(config.get_proxy_addr())
-        .await
-        .expect("Failed to bind to address");
+    let tcp_listener = match TcpListener::bind(config.get_proxy_addr()).await {
+        Ok(listener) => listener,
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                "Failed to bind to address {}", config.get_proxy_addr()
+            );
 
+            std::process::exit(1);
+        }
+    };
     println!(
         "ProxyMambo is listening for incoming on {}",
         tcp_listener.local_addr().unwrap()

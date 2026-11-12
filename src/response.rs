@@ -1,15 +1,5 @@
+use crate::types::ErrorResponse;
 use tokio::io::{AsyncWrite, AsyncWriteExt};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ErrorResponse {
-    BadRequest,
-    NotFound,
-    RequestHeaderFieldsTooLarge,
-    InternalServerError,
-    BadGateway,
-    ServiceUnavailable,
-    Forbidden,
-}
 
 /*
     Represents different types of error responses that can be sent to the client.
