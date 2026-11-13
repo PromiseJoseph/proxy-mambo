@@ -14,7 +14,7 @@ pub async fn handle_stream(
 
         match proxy::relay(client_stream, &client, config).await {
             Ok(()) => {
-                println!("Finished proxy connection for {}", peer_addr);
+                tracing::info!(client = %peer_addr, "Finished proxying for client");
                 return Ok(());
             }
             Err(e) => {

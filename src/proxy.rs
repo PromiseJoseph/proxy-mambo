@@ -25,7 +25,7 @@ pub async fn relay(
         let bytes_read = match client_stream.read(&mut chunk).await {
             Ok(bytes) => bytes,
             Err(e) => {
-                eprintln!("Error reading from client: {}", e);
+                tracing::error!(error = %e, "Error reading from client");
                 return Err(Error::new(ErrorKind::Other, "Failed to read from client."));
             }
         };
@@ -46,6 +46,7 @@ pub async fn relay(
                     "HTTP headers are too large",
                 ));
             }
+            tracing::error!("HTTP headers are too large: {} bytes", end);
 
             break end;
         } //to be addressed as a http response with status code 431 Request Header Fields Too Large..
@@ -65,6 +66,7 @@ pub async fn relay(
         {
             Ok((headers, addr)) => (headers, addr),
             Err(e) => {
+                tracing::error!(error = %e, "Failed to update request headers");
                 send_request_error(&mut client_stream, ProxyError::BadGateway).await?;
                 return Ok(());
             }
@@ -73,7 +75,7 @@ pub async fn relay(
     let mut upstream_stream = match connect_to_upstream(&upstream_addr).await {
         Ok(strm) => strm,
         Err(e) => {
-            eprintln!("Failed to connect to upstream: {}", e);
+            tracing::error!(error = %e, "Failed to connect to upstream");
 
             crate::response::send_error_response(&mut client_stream, ErrorResponse::BadGateway)
                 .await?;
