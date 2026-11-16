@@ -1,5 +1,6 @@
 use crate::types::{Config, LoadBalancingAlgorithm, Route, Upstream, UpstreamPool};
 use std::sync::{Arc, atomic::AtomicUsize};
+
 impl Config {
     pub fn new() -> Self {
         Self {

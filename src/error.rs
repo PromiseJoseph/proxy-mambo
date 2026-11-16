@@ -11,8 +11,8 @@ pub enum ProxyError {
     Forbidden(Option<String>),
 }
 
-impl From<ProxyError> for ErrorResponse {
-    fn from(error: ProxyError) -> Self {
+impl From<&ProxyError> for ErrorResponse {
+    fn from(error: &ProxyError) -> Self {
         match error {
             ProxyError::BadRequest(_) => Self::BadRequest,
             ProxyError::NotFound(_) => Self::NotFound,

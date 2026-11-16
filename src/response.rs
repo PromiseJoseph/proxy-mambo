@@ -50,7 +50,7 @@ pub async fn send_error_response<W>(
 where
     W: AsyncWrite + Unpin,
 {
-    let body = format!("{}\n", custom_message.unwrap_or("An error occurred"));
+    let body = format!("{}\n", custom_message.unwrap_or(error.message()));
 
     let response = format!(
         "HTTP/1.1 {} {}\r\n\

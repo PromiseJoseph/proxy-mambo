@@ -25,8 +25,11 @@ pub async fn relay(
         let bytes_read = match client_stream.read(&mut chunk).await {
             Ok(bytes) => bytes,
             Err(e) => {
-                send_request_error(&mut client_stream, ProxyError::BadRequest(None), None).await?;
-                return Err(Error::new(ErrorKind::Other, "Failed to read from client."));
+                send_request_error(&mut client_stream, &ProxyError::BadRequest(None), None).await?;
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("Failed to read from client stream: {}", e),
+                ));
             }
         };
 
@@ -43,7 +46,7 @@ pub async fn relay(
             if end > max_header_size {
                 send_request_error(
                     &mut client_stream,
-                    ProxyError::RequestHeaderFieldsTooLarge(None),
+                    &ProxyError::RequestHeaderFieldsTooLarge(None),
                     None,
                 )
                 .await?;
@@ -63,7 +66,7 @@ pub async fn relay(
             );
             send_request_error(
                 &mut client_stream,
-                ProxyError::RequestHeaderFieldsTooLarge(None),
+                &ProxyError::RequestHeaderFieldsTooLarge(None),
                 None,
             )
             .await?;
@@ -82,7 +85,7 @@ pub async fn relay(
             Ok((headers, addr)) => (headers, addr),
 
             Err(e) => {
-                tracing::error!(error = ?e, "Failed to update request headers");
+                tracing::error!(error = ?&e, "Failed to update request headers");
 
                 let message = match &e {
                     ProxyError::BadRequest(msg)
@@ -94,7 +97,7 @@ pub async fn relay(
                     | ProxyError::Forbidden(msg) => msg.as_deref(),
                 };
 
-                send_request_error(&mut client_stream, e, message).await?;
+                send_request_error(&mut client_stream, &e, message).await?;
                 return Ok(());
             }
         };
@@ -146,7 +149,7 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
 
 async fn send_request_error(
     client_stream: &mut TcpStream,
-    error: ProxyError,
+    error: &ProxyError,
     message: Option<&str>,
 ) -> std::io::Result<()> {
     let response = ErrorResponse::from(error);
