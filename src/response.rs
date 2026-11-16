@@ -42,11 +42,15 @@ impl ErrorResponse {
     }
 }
 
-pub async fn send_error_response<W>(stream: &mut W, error: ErrorResponse) -> std::io::Result<()>
+pub async fn send_error_response<W>(
+    stream: &mut W,
+    error: ErrorResponse,
+    custom_message: Option<&str>,
+) -> std::io::Result<()>
 where
     W: AsyncWrite + Unpin,
 {
-    let body = format!("{}\n", error.message());
+    let body = format!("{}\n", custom_message.unwrap_or("An error occurred"));
 
     let response = format!(
         "HTTP/1.1 {} {}\r\n\

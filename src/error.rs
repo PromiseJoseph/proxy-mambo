@@ -1,22 +1,26 @@
 use crate::types::ErrorResponse;
+
+#[derive(Debug, Clone)]
 pub enum ProxyError {
-    BadRequest,
-    NotFound,
-    RequestHeaderFieldsTooLarge,
-    UpstreamUnavailable,
-    BadGateway,
-    InternalServerError,
+    BadRequest(Option<String>),
+    NotFound(Option<String>),
+    RequestHeaderFieldsTooLarge(Option<String>),
+    UpstreamUnavailable(Option<String>),
+    BadGateway(Option<String>),
+    InternalServerError(Option<String>),
+    Forbidden(Option<String>),
 }
 
 impl From<ProxyError> for ErrorResponse {
     fn from(error: ProxyError) -> Self {
         match error {
-            ProxyError::BadRequest => Self::BadRequest,
-            ProxyError::NotFound => Self::NotFound,
-            ProxyError::RequestHeaderFieldsTooLarge => Self::RequestHeaderFieldsTooLarge,
-            ProxyError::UpstreamUnavailable => Self::ServiceUnavailable,
-            ProxyError::BadGateway => Self::BadGateway,
-            ProxyError::InternalServerError => Self::InternalServerError,
+            ProxyError::BadRequest(_) => Self::BadRequest,
+            ProxyError::NotFound(_) => Self::NotFound,
+            ProxyError::RequestHeaderFieldsTooLarge(_) => Self::RequestHeaderFieldsTooLarge,
+            ProxyError::UpstreamUnavailable(_) => Self::ServiceUnavailable,
+            ProxyError::BadGateway(_) => Self::BadGateway,
+            ProxyError::InternalServerError(_) => Self::InternalServerError,
+            ProxyError::Forbidden(_) => Self::Forbidden,
         }
     }
 }

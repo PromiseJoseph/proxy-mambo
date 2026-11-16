@@ -1,7 +1,7 @@
 use crate::error::ProxyError;
+use crate::request;
 use crate::response::send_error_response;
 use crate::types::{Client, Config, ErrorResponse};
-use crate::{proxy, request};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use tokio::io::copy_bidirectional;
@@ -12,7 +12,7 @@ pub async fn relay(
     mut client_stream: TcpStream,
     client: &Client,
     config: Arc<Config>,
-) -> Result<(), std::io::Error> {
+) -> Result<(), Error> {
     // Connect to the upstream server
 
     let mut request_buffer = Vec::with_capacity(4096);
@@ -25,7 +25,7 @@ pub async fn relay(
         let bytes_read = match client_stream.read(&mut chunk).await {
             Ok(bytes) => bytes,
             Err(e) => {
-                tracing::error!(error = %e, "Error reading from client");
+                send_request_error(&mut client_stream, ProxyError::BadRequest(None), None).await?;
                 return Err(Error::new(ErrorKind::Other, "Failed to read from client."));
             }
         };
@@ -41,17 +41,32 @@ pub async fn relay(
 
         if let Some(end) = find_header_end(&request_buffer) {
             if end > max_header_size {
+                send_request_error(
+                    &mut client_stream,
+                    ProxyError::RequestHeaderFieldsTooLarge(None),
+                    None,
+                )
+                .await?;
+
                 return Err(Error::new(
                     ErrorKind::InvalidData,
                     "HTTP headers are too large",
                 ));
             }
-            tracing::error!("HTTP headers are too large: {} bytes", end);
-
             break end;
         } //to be addressed as a http response with status code 431 Request Header Fields Too Large..
 
         if request_buffer.len() > max_header_size {
+            tracing::error!(
+                "HTTP headers exceeded maximum size: {} bytes",
+                request_buffer.len()
+            );
+            send_request_error(
+                &mut client_stream,
+                ProxyError::RequestHeaderFieldsTooLarge(None),
+                None,
+            )
+            .await?;
             return Err(Error::new(
                 ErrorKind::InvalidData,
                 "HTTP headers are too large",
@@ -65,9 +80,21 @@ pub async fn relay(
             .await
         {
             Ok((headers, addr)) => (headers, addr),
+
             Err(e) => {
-                tracing::error!(error = %e, "Failed to update request headers");
-                send_request_error(&mut client_stream, ProxyError::BadGateway).await?;
+                tracing::error!(error = ?e, "Failed to update request headers");
+
+                let message = match &e {
+                    ProxyError::BadRequest(msg)
+                    | ProxyError::NotFound(msg)
+                    | ProxyError::RequestHeaderFieldsTooLarge(msg)
+                    | ProxyError::UpstreamUnavailable(msg)
+                    | ProxyError::BadGateway(msg)
+                    | ProxyError::InternalServerError(msg)
+                    | ProxyError::Forbidden(msg) => msg.as_deref(),
+                };
+
+                send_request_error(&mut client_stream, e, message).await?;
                 return Ok(());
             }
         };
@@ -76,9 +103,7 @@ pub async fn relay(
         Ok(strm) => strm,
         Err(e) => {
             tracing::error!(error = %e, "Failed to connect to upstream");
-
-            crate::response::send_error_response(&mut client_stream, ErrorResponse::BadGateway)
-                .await?;
+            send_error_response(&mut client_stream, ErrorResponse::BadGateway, None).await?;
 
             return Ok(());
         }
@@ -94,9 +119,12 @@ pub async fn relay(
     let (client_to_upstream, upstream_to_client) =
         copy_bidirectional(&mut client_stream, &mut upstream_stream).await?;
 
-    println!(
-        "Finished relaying. Client -> upstream: {} bytes, upstream -> client: {} bytes",
-        client_to_upstream, upstream_to_client
+    tracing::info!(
+        client = %client.peer_addr,
+        upstream = %upstream_addr,
+        "Relayed {} bytes from client to upstream and {} bytes from upstream to client",
+        client_to_upstream,
+        upstream_to_client
     );
 
     Ok(())
@@ -105,7 +133,7 @@ pub async fn relay(
 //=== handles connection to upstream ===//
 async fn connect_to_upstream(upstream_addr: &str) -> Result<TcpStream, std::io::Error> {
     //for debugging purpose first basic test.
-    println!("Connecting to an upstream server at {}", upstream_addr);
+    tracing::info!("Connecting to an upstream server at {}", upstream_addr);
     TcpStream::connect(upstream_addr).await
 }
 
@@ -116,11 +144,11 @@ fn find_header_end(buffer: &[u8]) -> Option<usize> {
         .map(|position| position + 4)
 }
 
-pub async fn send_request_error(
+async fn send_request_error(
     client_stream: &mut TcpStream,
     error: ProxyError,
+    message: Option<&str>,
 ) -> std::io::Result<()> {
     let response = ErrorResponse::from(error);
-
-    send_error_response(client_stream, response).await
+    send_error_response(client_stream, response, message).await
 }

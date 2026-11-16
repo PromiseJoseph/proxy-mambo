@@ -18,7 +18,7 @@ pub async fn handle_stream(
                 return Ok(());
             }
             Err(e) => {
-                eprintln!("Proxying for {} failed: {}", peer_addr, e);
+                tracing::error!(client = %peer_addr, error = %e, "Proxying for client failed");
                 return Err(e);
             }
         }
