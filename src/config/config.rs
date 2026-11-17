@@ -15,12 +15,12 @@ impl Config {
                     addr: "127.0.0.1:8000".to_string(),
                 }],
             }],
-            max_header_size: 16384, // Default maximum header size set to 16KiB
+            max_header_size: 16384,
             routes: vec![],
         }
     }
 
-    /* ===Upstream management methods=== */
+    // Upstream management
 
     pub fn add_upstream(&mut self, upstream_pool_id: &str, upstream: Upstream) {
         if let Some(pool) = self
@@ -50,12 +50,12 @@ impl Config {
     }
 
     pub fn get_upstream(&self, pool_id: &str, upstream_id: &str) -> Option<&Upstream> {
-        if let Some(pool) = self.upstream_pools.iter().find(|p| p.id == pool_id) {
-            pool.upstreams.iter().find(|u| u.id == upstream_id)
-        } else {
-            None
-        }
+        self.upstream_pools
+            .iter()
+            .find(|p| p.id == pool_id)
+            .and_then(|pool| pool.upstreams.iter().find(|u| u.id == upstream_id))
     }
+
     pub fn get_upstream_pool(&self, pool_id: &str) -> Option<&UpstreamPool> {
         self.upstream_pools.iter().find(|p| p.id == pool_id)
     }
@@ -69,6 +69,7 @@ impl Config {
             .iter()
             .any(|p| p.id == pool_id && p.upstreams.iter().any(|u| u.id == upstream_id))
     }
+
     pub fn check_upstream_pool_exists(&self, id: &str) -> bool {
         self.upstream_pools.iter().any(|p| p.id == id)
     }
@@ -80,7 +81,8 @@ impl Config {
             .map(|p| &p.algorithm)
     }
 
-    /* ===Proxy address and header size management methods=== */
+    // Proxy address and header size
+
     pub fn set_proxy_addr(&mut self, addr: &str) {
         self.proxy_addr = addr.to_string();
     }
@@ -97,7 +99,8 @@ impl Config {
         self.max_header_size
     }
 
-    /* ===Route management methods=== */
+    // Route management
+
     pub fn set_route(&mut self, route: Route) {
         self.routes.push(route);
     }

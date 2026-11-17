@@ -14,11 +14,11 @@ pub async fn handle_stream(
 
         match proxy::relay(client_stream, &client, config).await {
             Ok(()) => {
-                println!("Finished proxy connection for {}", peer_addr);
+                tracing::info!(client = %peer_addr, "Finished proxying for client");
                 return Ok(());
             }
             Err(e) => {
-                eprintln!("Proxying for {} failed: {}", peer_addr, e);
+                tracing::error!(client = %peer_addr, error = %e, "Proxying for client failed");
                 return Err(e);
             }
         }

@@ -1,0 +1,45 @@
+[server]
+address = "127.0.0.1:7777"
+max_header_size = 8192
+
+[logging]
+level = "info"
+
+[[upstream_pools]]
+id = "api"
+algorithm = "round_robin"
+
+[[upstream_pools.upstreams]]
+id = "api-1"
+address = "127.0.0.1:8000"
+
+[[upstream_pools]]
+id = "guest"
+algorithm = "weighted_round_robin"
+
+[[upstream_pools.upstreams]]
+id = "guest-1"
+address = "127.0.0.1:8001"
+weight = 5
+
+[[upstream_pools.upstreams]]
+id = "guest-2"
+address = "127.0.0.1:8002"
+weight = 1
+
+[[upstream_pools.upstreams]]
+id = "guest-3"
+address = "127.0.0.1:8003"
+weight = 1
+
+[[routes]]
+path = "/api"
+pool_id = "api"
+
+[[routes]]
+path = "/api/*"
+pool_id = "api"
+
+[[routes]]
+path = "/"
+pool_id = "guest"

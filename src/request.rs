@@ -1,11 +1,9 @@
 use crate::{
     algorithm,
+    error::ProxyError,
     types::{Client, Config, Route, UpstreamPool},
 };
-use std::{
-    io::{Error, ErrorKind, Result},
-    println,
-};
+
 /**
  *  Parse request string and return a HttpRequest struct.
  */
@@ -14,44 +12,54 @@ pub async fn update_request_headers(
     header: &[u8],
     client: &Client,
     config: &Config,
-) -> Result<(Vec<u8>, String)> {
+) -> Result<(Vec<u8>, String), ProxyError> {
     if !header.ends_with(b"\r\n\r\n") {
-        return Err(Error::new(ErrorKind::InvalidData, "Incomplete HTTP header")); // to be addressed as a http response with status code 400 Bad Request..
+        return Err(ProxyError::BadRequest(Some(
+            "Incomplete HTTP header".into(),
+        ))); // to be addressed as a http response with status code 400 Bad Request..
     }
 
     // Remove the final header separator temporarily.
     let header_content = &header[..header.len() - 4];
 
     let (method, path, version) = parse_request_line(header_content)?;
-    println!(
+    tracing::info!(
         "Parsed request line: method={}, path={}, version={}",
-        method, path, version
+        method,
+        path,
+        version
     );
+
     // Find the upstream pool for the requested path.
     let pool = find_upstream_for_path(path, config);
 
     if pool.is_none() {
-        return Err(Error::new(
-            ErrorKind::NotFound,
-            "No upstream found for the requested path",
-        ));
+        tracing::error!("No upstream found for path: {}", path);
+        return Err(ProxyError::NotFound(Some(
+            "Internal server error, contact administrator if error persists".into(),
+        )));
     } //to be addressed as a http response with status code 404 Not Found..
-    println!("Found upstream pool  for path: {}, Pool: {:?}", path, pool);
+    tracing::info!("Found upstream pool  for path: {}, Pool: {:?}", path, pool);
 
     let upstream_pool = pool.unwrap();
-
+    tracing::info!("Using upstream pool: {:?}", upstream_pool);
     let upstream = algorithm::use_algorithm(upstream_pool).await;
 
     let upstream_host = upstream
-        .ok_or_else(|| Error::new(ErrorKind::NotFound, "No upstream available"))?
+        .ok_or_else(|| {
+            tracing::error!("No upstream available");
+            ProxyError::InternalServerError(Some(
+                "Internal server error, contact administrator if error persists".into(),
+            ))
+        })?
         .addr
         .clone(); //to be addressed as a http response with status code 503 Service Unavailable..
 
     if upstream_host.contains('\r') || upstream_host.contains('\n') {
-        return Err(Error::new(
-            ErrorKind::InvalidInput,
-            "Invalid upstream Host value",
-        )); //to be addressed as a http response with status code 502 Bad Gateway..
+        tracing::error!("Invalid upstream Host value: {}", upstream_host);
+        return Err(ProxyError::InternalServerError(Some(
+            "Internal server error, contact administrator if error persists".into(),
+        )));
     }
 
     let mut updated = Vec::with_capacity(header.len() + 128); //updated to be more efficient.. preallocate the vector with enough capacity to hold the original header and the new header items.
@@ -72,10 +80,9 @@ pub async fn update_request_headers(
 
         if is_host {
             if incoming_host.is_some() {
-                return Err(Error::new(
-                    ErrorKind::InvalidData,
-                    "Request contains multiple Host headers",
-                ));
+                return Err(ProxyError::BadRequest(Some(
+                    "Multiple Host headers found".into(),
+                ))); // to be addressed as a http response with status code 400 Bad Request..
             }
 
             // Extract the value of the Host header.
@@ -121,26 +128,28 @@ pub async fn update_request_headers(
 }
 
 // extract the method, path, and version from the request line.
-fn parse_request_line(raw_header: &[u8]) -> Result<(&str, &str, &str)> {
+fn parse_request_line(raw_header: &[u8]) -> Result<(&str, &str, &str), ProxyError> {
     let request_header = std::str::from_utf8(raw_header)
-        .map_err(|_| Error::new(ErrorKind::InvalidData, "HTTP header is not valid UTF-8"))?; // to be addressed as a http response with status code 400 Bad Request..
+        .map_err(|_| ProxyError::BadRequest(Some("HTTP header is not valid UTF-8".into())))?; // to be addressed as a http response with status code 400 Bad Request..
 
     let request_line = request_header
         .lines()
         .next()
-        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Missing HTTP request line"))?; // to be addressed as a http response with status code 400 Bad Request..
+        .ok_or_else(|| ProxyError::BadRequest(Some("Missing HTTP request line".into())))?; // to be addressed as a http response with status code 400 Bad Request..
+
+    // tracing::info!("Request line: {}", request_line);
 
     let mut parts = request_line.split_whitespace();
 
     let method = parts
         .next()
-        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Missing HTTP method"))?; // to be addressed as a http response with status code 400 Bad Request..
+        .ok_or_else(|| ProxyError::BadRequest(Some("Missing HTTP method".into())))?; // to be addressed as a http response with status code 400 Bad Request..
     let path = parts
         .next()
-        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Missing request path"))?; // to be addressed as a http response with status code 400 Bad Request..
+        .ok_or_else(|| ProxyError::BadRequest(Some("Missing request path".into())))?; // to be addressed as a http response with status code 400 Bad Request..
     let version = parts
         .next()
-        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Missing HTTP version"))?; // to be addressed as a http response with status code 400 Bad Request..
+        .ok_or_else(|| ProxyError::BadRequest(Some("Missing HTTP version".into())))?; // to be addressed as a http response with status code 400 Bad Request..
     return Ok((method, path, version));
 }
 
